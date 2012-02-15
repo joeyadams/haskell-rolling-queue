@@ -44,8 +44,8 @@ Example:
 
 @
 logQueue :: 'RollingQueue' LogEntry
-logQueue = 'System.IO.unsafePerformIO' (RQ.'newIO' 1000)
-{-# NOINLINE logQueue #-}
+logQueue = 'System.IO.Unsafe.unsafePerformIO' (RQ.'newIO' 1000)
+\{\-\# NOINLINE logQueue \#\-\}
 @
 -}
 newIO :: Int -> IO (RollingQueue a)
