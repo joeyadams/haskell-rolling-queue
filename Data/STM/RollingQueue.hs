@@ -9,6 +9,7 @@
 --
 -- >import Data.STM.RollingQueue (RollingQueue)
 -- >import qualified Data.STM.RollingQueue as RQ
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.STM.RollingQueue (
     RollingQueue,
     new,
@@ -23,15 +24,33 @@ module Data.STM.RollingQueue (
 import Prelude hiding (read)
 
 import Control.Concurrent.STM
-import Data.Int (Int64)
+import Data.Typeable (Typeable)
 
 -- | A 'RollingQueue' is a bounded FIFO channel.  When the size limit is
 -- exceeded, older entries are discarded to make way for newer entries.
 --
 -- Note: if the size limit is less than @1@, 'write' will have no effect, and
 -- 'read' will always 'retry'.
-data RollingQueue a
-    = RollingQueue
+data RollingQueue a = RQ (TVar (ReadEnd a)) (TVar (WriteEnd a))
+    deriving Typeable
+
+instance Eq (RollingQueue a) where
+    (==) (RQ r1 _) (RQ r2 _) = r1 == r2
+
+data ReadEnd a = ReadEnd   !(TCell a)   -- Pointer to next item in the stream
+                           !Int         -- Number of reads since we last synced
+                                        -- with the writer
+                           !Int         -- Number of log entries discarded
+                                        -- since the last read
+
+data WriteEnd a = WriteEnd !(TCell a)   -- Pointer to the hole (which is a TNil)
+                           !Int         -- Number of writes since we last
+                                        -- synced with the reader
+                           !Int         -- Size limit
+
+type TCell a = TVar (TList a)
+data TList a = TNil | TCons a (TCell a)
+
 
 -- | Create a new, empty 'RollingQueue', with the given size limit.
 --
@@ -66,12 +85,15 @@ write = undefined
 
 -- | Read the next entry from the 'RollingQueue'.  'retry' if the queue is
 -- empty.
-read :: RollingQueue a -> STM a
+--
+-- The 'Int' is the number of entries discarded since the last read operation
+-- (usually 0).
+read :: RollingQueue a -> STM (a, Int)
 read = undefined
 
 -- | Like 'read', but do not 'retry'.  Instead, return 'Nothing' if the queue
 -- is empty.
-tryRead :: RollingQueue a -> STM (Maybe a)
+tryRead :: RollingQueue a -> STM (Maybe (a, Int))
 tryRead = undefined
 
 -- | Test if the queue is empty.
