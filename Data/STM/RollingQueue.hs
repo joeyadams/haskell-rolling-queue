@@ -1,4 +1,10 @@
 -- |
+-- Module:       Data.STM.RollingQueue
+-- Copyright:    (c) Joseph Adams 2012
+-- License:      BSD3
+-- Maintainer:   joeyadams3.14159@gmail.com
+-- Portability:  Requires STM
+--
 -- This module is usually imported qualified:
 --
 -- >import Data.STM.RollingQueue (RollingQueue)
@@ -22,8 +28,8 @@ import Data.Int (Int64)
 -- | A 'RollingQueue' is a bounded FIFO channel.  When the size limit is
 -- exceeded, older entries are discarded to make way for newer entries.
 --
--- Note: if the size limit is <= 0, 'write' will have no effect, and 'read'
--- will always 'retry'.
+-- Note: if the size limit is less than @1@, 'write' will have no effect, and
+-- 'read' will always 'retry'.
 data RollingQueue a
     = RollingQueue
 
