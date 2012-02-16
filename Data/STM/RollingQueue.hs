@@ -18,10 +18,11 @@ module Data.STM.RollingQueue (
     read,
     tryRead,
     isEmpty,
+    length,
     setLimit,
 ) where
 
-import Prelude hiding (read)
+import Prelude hiding (length, read)
 
 import Control.Concurrent.STM
 import Data.Typeable (Typeable)
@@ -34,19 +35,47 @@ import Data.Typeable (Typeable)
 data RollingQueue a = RQ (TVar (ReadEnd a)) (TVar (WriteEnd a))
     deriving Typeable
 
+-- Invariants:
+--
+--  * writeCounter - readCounter = number of items in the queue
+--
+--  * writeCounter >= readCounter, since the queue count cannot be negative
+
 instance Eq (RollingQueue a) where
     (==) (RQ r1 _) (RQ r2 _) = r1 == r2
 
-data ReadEnd a = ReadEnd   !(TCell a)   -- Pointer to next item in the stream
-                           !Int         -- Number of reads since we last synced
-                                        -- with the writer
-                           !Int         -- Number of log entries discarded
-                                        -- since the last read
+-- | Invariants:
+--
+--  * readCounter >= 0, readDiscarded >= 0
+data ReadEnd a =
+    ReadEnd
+        { readPtr       :: !(TCell a)
+            -- ^ Pointer to next item in the stream
+        , readCounter   :: !Int
+            -- ^ Number of reads since we last synced with the writer
+        , readDiscarded :: !Int
+            -- ^ Number of log entries discarded since the last read
+        }
 
-data WriteEnd a = WriteEnd !(TCell a)   -- Pointer to the hole (which is a TNil)
-                           !Int         -- Number of writes since we last
-                                        -- synced with the reader
-                           !Int         -- Size limit
+-- | Invariants:
+--
+--  * readTVar writePtr ==> TNil
+--
+--  * writeCounter <= sizeLimit.  However, this will normally be false for the
+--    'WriteEnd' passed to 'syncEnds'.
+--
+--  * writeCounter >= 0, sizeLimit >= 0
+data WriteEnd a =
+    WriteEnd
+        { writePtr      :: !(TCell a)
+            -- ^ Pointer to the hole (which is a TNil)
+        , writeCounter  :: !Int
+            -- ^ Write counter.  Number of items in the queue, not taking into
+            -- account reads performed since the last call to 'syncEnds'.
+        , sizeLimit     :: !Int
+            -- ^ The size limit of the RollingQueue is stored here, in the
+            --   'WriteEnd'.  This makes it convenient for 'write' to access.
+        }
 
 type TCell a = TVar (TList a)
 data TList a = TNil | TCons a (TCell a)
@@ -100,7 +129,43 @@ tryRead = undefined
 isEmpty :: RollingQueue a -> STM Bool
 isEmpty = undefined
 
+-- | /O(1)/ Get the number of items in the queue.
+length :: RollingQueue a -> STM Int
+length = undefined
+
 -- | Adjust the size limit.  Queue entries will be discarded if necessary to
 -- satisfy the new limit.
 setLimit :: Int -> RollingQueue a -> STM ()
 setLimit = undefined
+
+------------------------------------------------------------------------
+-- Internal
+
+-- | Sync the reader and writer.  This sets the ReadEnd's counter to 0, and
+-- discards old log entries to satisfy the size limit (if necessary).
+syncEnds :: ReadEnd a -> WriteEnd a -> STM (ReadEnd a, WriteEnd a)
+syncEnds r w = do
+    let count = writeCounter w - readCounter r
+        limit = sizeLimit w
+    if count > limit
+        then do
+            let drop_count = count - limit
+            rp' <- dropItems drop_count (readPtr r)
+            return ( ReadEnd rp' 0 (readDiscarded r + drop_count)
+                   , WriteEnd (writePtr w) limit limit
+                   )
+        else
+            return ( ReadEnd (readPtr r) 0 (readDiscarded r)
+                   , WriteEnd (writePtr w) count limit
+                   )
+
+-- | TCell variant of 'drop'.  This does not modify the cells themselves, it
+-- just returns the new pointer.
+dropItems :: Int -> TCell a -> STM (TCell a)
+dropItems n cell
+    | n <= 0    = return cell
+    | otherwise = do
+        xs <- readTVar cell
+        case xs of
+            TNil          -> return cell
+            TCons _ cell' -> dropItems (n-1) cell'
