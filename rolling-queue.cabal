@@ -33,6 +33,10 @@ extra-source-files:
     testing/trivial.hs
     testing/trivial.expected
 
+source-repository head
+    type:       git
+    location:   git://github.com/joeyadams/haskell-rolling-queue.git
+
 library
     exposed-modules:
         Data.STM.RollingQueue
