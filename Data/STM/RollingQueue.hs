@@ -171,8 +171,8 @@ length (RQ rv wv) = do
 
 -- | Adjust the size limit.  Queue entries will be discarded if necessary to
 -- satisfy the new limit.
-setLimit :: Int -> RollingQueue a -> STM ()
-setLimit new_limit rq@(RQ _ wv) = do
+setLimit :: RollingQueue a -> Int -> STM ()
+setLimit rq@(RQ _ wv) new_limit = do
     w <- readTVar wv
     updateWriteEnd rq w{sizeLimit = max 0 new_limit}
 
