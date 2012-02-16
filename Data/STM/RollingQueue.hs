@@ -89,7 +89,11 @@ data TList a = TNil | TCons a (TCell a)
 --
 -- To change the size limit later, use 'setLimit'.
 new :: Int -> STM (RollingQueue a)
-new limit = undefined
+new limit = do
+    hole <- newTVar TNil
+    rv <- newTVar $ ReadEnd hole 0 0
+    wv <- newTVar $ WriteEnd hole 0 (max 0 limit)
+    return (RQ rv wv)
 
 {- |
 @IO@ variant of 'new'.  This is useful for creating top-level
@@ -107,14 +111,22 @@ logQueue = 'System.IO.Unsafe.unsafePerformIO' (RQ.'newIO' 1000)
 @
 -}
 newIO :: Int -> IO (RollingQueue a)
-newIO limit = undefined
+newIO limit = do
+    hole <- newTVarIO TNil
+    rv <- newTVarIO $ ReadEnd hole 0 0
+    wv <- newTVarIO $ WriteEnd hole 0 (max 0 limit)
+    return (RQ rv wv)
 
 -- | Write an entry to the rolling queue.  If the queue is full, discard the
 -- oldest entry.
 --
 -- There is no @tryWrite@, because 'write' never retries.
 write :: RollingQueue a -> a -> STM ()
-write = undefined
+write rq@(RQ _ wv) x = do
+    w <- readTVar wv
+    new_hole <- newTVar TNil
+    writeTVar (writePtr w) (TCons x new_hole)
+    updateWriteEnd rq $ WriteEnd new_hole (writeCounter w + 1) (sizeLimit w)
 
 -- | Read the next entry from the 'RollingQueue'.  'retry' if the queue is
 -- empty.
@@ -140,10 +152,23 @@ length = undefined
 -- | Adjust the size limit.  Queue entries will be discarded if necessary to
 -- satisfy the new limit.
 setLimit :: Int -> RollingQueue a -> STM ()
-setLimit = undefined
+setLimit new_limit rq@(RQ _ wv) = do
+    w <- readTVar wv
+    updateWriteEnd rq w{sizeLimit = max 0 new_limit}
 
 ------------------------------------------------------------------------
 -- Internal
+
+-- | Update the 'WriteEnd'.  If the size limit is exceeded, use 'syncEnds'.
+updateWriteEnd :: RollingQueue a -> WriteEnd a -> STM ()
+updateWriteEnd (RQ rv wv) w
+    | writeCounter w <= sizeLimit w
+    = writeTVar wv w
+    | otherwise = do
+        r <- readTVar rv
+        (r', w') <- syncEnds r w
+        writeTVar rv r'
+        writeTVar wv w'
 
 -- | Sync the reader and writer.  This sets the ReadEnd's counter to 0, and
 -- discards old log entries to satisfy the size limit (if necessary).
