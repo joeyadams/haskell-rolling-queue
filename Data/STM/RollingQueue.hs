@@ -9,7 +9,7 @@
 --
 -- >import Data.STM.RollingQueue (RollingQueue)
 -- >import qualified Data.STM.RollingQueue as RQ
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
 module Data.STM.RollingQueue (
     RollingQueue,
     new,
@@ -20,11 +20,15 @@ module Data.STM.RollingQueue (
     isEmpty,
     length,
     setLimit,
+
+    -- * Debugging
+    checkInvariants,
 ) where
 
 import Prelude hiding (length, read)
 
-import Control.Concurrent.STM
+import Control.Concurrent.STM hiding (check)
+import Control.Exception (Exception)
 import Data.Typeable (Typeable)
 
 -- | A 'RollingQueue' is a bounded FIFO channel.  When the size limit is
@@ -169,3 +173,50 @@ dropItems n cell
         case xs of
             TNil          -> return cell
             TCons _ cell' -> dropItems (n-1) cell'
+
+------------------------------------------------------------------------
+-- Debugging
+
+data CheckException = CheckNotTrue String | CheckMsg String
+    deriving Typeable
+
+instance Show CheckException where
+    show (CheckNotTrue expr) =
+        "Data.STM.RollingQueue checkInvariants: " ++ expr ++ " does not hold"
+    show (CheckMsg msg) =
+        "Data.STM.RollingQueue checkInvariants: " ++ msg
+
+instance Exception CheckException
+
+checkInvariants :: RollingQueue a -> STM ()
+checkInvariants (RQ rv wv) = do
+    r <- readTVar rv
+    w <- readTVar wv
+
+    check (readCounter   r >= 0) "readCounter >= 0"
+    check (readDiscarded r >= 0) "readDiscarded >= 0"
+
+    check (writeCounter w >= 0) "writeCounter >= 0"
+    check (sizeLimit    w >= 0) "sizeLimit >= 0"
+    check (writeCounter w <= sizeLimit w) "writeCounter <= sizeLimit"
+    hole <- readTVar (writePtr w)
+    case hole of
+        TNil      -> return ()
+        TCons _ _ -> throwSTM (CheckMsg "writePtr does not point to a TNil")
+
+    check (writeCounter w >= readCounter r) "writeCounter >= readCounter"
+    len <- traverseLength (readPtr r)
+    check (writeCounter w - readCounter r == len) "writeCounter - readCounter == length"
+
+    where
+        check b expr | b         = return ()
+                     | otherwise = throwSTM (CheckNotTrue expr)
+
+traverseLength :: TCell a -> STM Int
+traverseLength = loop 0
+    where
+        loop !n cell = do
+            xs <- readTVar cell
+            case xs of
+                TNil          -> return n
+                TCons _ cell' -> loop (n+1) cell'
