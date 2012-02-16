@@ -25,13 +25,15 @@ module Data.STM.RollingQueue (
     -- * Debugging
     checkInvariants,
     CheckException(..),
-    getItems,
+    dump,
 ) where
 
 import Prelude hiding (length, read)
+import qualified Prelude
 
 import Control.Concurrent.STM hiding (check)
 import Control.Exception (Exception)
+import Control.Monad (join)
 import Data.Typeable (Typeable)
 
 -- | A 'RollingQueue' is a bounded FIFO channel.  When the size limit is
@@ -174,7 +176,8 @@ setLimit new_limit rq@(RQ _ wv) = do
     w <- readTVar wv
     updateWriteEnd rq w{sizeLimit = max 0 new_limit}
 
--- | Get the current size limit.
+-- | Get the current size limit.  This will return 0 if a negative value was
+-- passed to 'new', 'newIO', or 'setLimit'.
 getLimit :: RollingQueue a -> STM Int
 getLimit (RQ _ wv) = do
     w <- readTVar wv
@@ -281,3 +284,27 @@ getItems (RQ rv _) = do
             case xs of
                 TNil          -> return $ dl []
                 TCons x cell' -> loop (dl . (x :)) cell'
+
+-- | Return a list of internal values as key-value pairs.
+getAttributes :: RollingQueue a -> STM [(String, String)]
+getAttributes (RQ rv wv) = do
+    r <- readTVar rv
+    w <- readTVar wv
+    return [ ("readCounter",    show $ readCounter r)
+           , ("readDiscarded",  show $ readDiscarded r)
+           , ("writeCounter",   show $ writeCounter w)
+           , ("sizeLimit",      show $ sizeLimit w)
+           ]
+
+-- | Dump the RollingQueue (output and internal counters) to standard output.
+-- This calls 'checkInvariants' first.
+dump :: Show a => RollingQueue a -> IO ()
+dump rq = join $ atomically $ do
+    checkInvariants rq
+    xs    <- getItems rq
+    attrs <- getAttributes rq
+    return $ do
+        print xs
+        let c1width = maximum $ map (Prelude.length . fst) attrs
+        mapM_ putStrLn
+            [k ++ replicate (c1width - Prelude.length k) ' ' ++ " = " ++ v | (k, v) <- attrs]
