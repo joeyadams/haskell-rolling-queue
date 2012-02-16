@@ -20,6 +20,7 @@ module Data.STM.RollingQueue (
     isEmpty,
     length,
     setLimit,
+    getLimit,
 
     -- * Debugging
     checkInvariants,
@@ -155,6 +156,12 @@ setLimit :: Int -> RollingQueue a -> STM ()
 setLimit new_limit rq@(RQ _ wv) = do
     w <- readTVar wv
     updateWriteEnd rq w{sizeLimit = max 0 new_limit}
+
+-- | Get the current size limit.
+getLimit :: RollingQueue a -> STM Int
+getLimit (RQ _ wv) = do
+    w <- readTVar wv
+    return (sizeLimit w)
 
 ------------------------------------------------------------------------
 -- Internal
