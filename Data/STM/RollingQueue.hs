@@ -24,6 +24,8 @@ module Data.STM.RollingQueue (
 
     -- * Debugging
     checkInvariants,
+    CheckException(..),
+    getItems,
 ) where
 
 import Prelude hiding (length, read)
@@ -224,17 +226,16 @@ dropItems n cell
 ------------------------------------------------------------------------
 -- Debugging
 
-data CheckException = CheckNotTrue String | CheckMsg String
+data CheckException = CheckException String
     deriving Typeable
 
 instance Show CheckException where
-    show (CheckNotTrue expr) =
-        "Data.STM.RollingQueue checkInvariants: " ++ expr ++ " does not hold"
-    show (CheckMsg msg) =
-        "Data.STM.RollingQueue checkInvariants: " ++ msg
+    show (CheckException msg) = "Data.STM.RollingQueue checkInvariants: " ++ msg
 
 instance Exception CheckException
 
+-- | Verify internal structure.  Throw a 'CheckException' if the check fails,
+-- signifying a bug in the implementation.
 checkInvariants :: RollingQueue a -> STM ()
 checkInvariants (RQ rv wv) = do
     r <- readTVar rv
@@ -249,7 +250,7 @@ checkInvariants (RQ rv wv) = do
     hole <- readTVar (writePtr w)
     case hole of
         TNil      -> return ()
-        TCons _ _ -> throwSTM (CheckMsg "writePtr does not point to a TNil")
+        TCons _ _ -> throwSTM $ CheckException "writePtr does not point to a TNil"
 
     check (writeCounter w >= readCounter r) "writeCounter >= readCounter"
     len <- traverseLength (readPtr r)
@@ -257,7 +258,7 @@ checkInvariants (RQ rv wv) = do
 
     where
         check b expr | b         = return ()
-                     | otherwise = throwSTM (CheckNotTrue expr)
+                     | otherwise = throwSTM $ CheckException $ expr ++ " does not hold"
 
 traverseLength :: TCell a -> STM Int
 traverseLength = loop 0
@@ -267,3 +268,16 @@ traverseLength = loop 0
             case xs of
                 TNil          -> return n
                 TCons _ cell' -> loop (n+1) cell'
+
+-- | Return a list of all items currently in the queue.  This does not modify
+-- the 'RollingQueue'.
+getItems :: RollingQueue a -> STM [a]
+getItems (RQ rv _) = do
+    r <- readTVar rv
+    loop id (readPtr r)
+    where
+        loop dl cell = do
+            xs <- readTVar cell
+            case xs of
+                TNil          -> return $ dl []
+                TCons x cell' -> loop (dl . (x :)) cell'
