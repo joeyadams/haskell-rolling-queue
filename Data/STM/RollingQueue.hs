@@ -135,20 +135,35 @@ write rq@(RQ _ wv) x = do
 -- The 'Int' is the number of entries discarded since the last read operation
 -- (usually 0).
 read :: RollingQueue a -> STM (a, Int)
-read = undefined
+read rq = tryRead rq >>= maybe retry return
 
 -- | Like 'read', but do not 'retry'.  Instead, return 'Nothing' if the queue
 -- is empty.
 tryRead :: RollingQueue a -> STM (Maybe (a, Int))
-tryRead = undefined
+tryRead (RQ rv _) = do
+    r <- readTVar rv
+    xs <- readTVar (readPtr r)
+    case xs of
+        TNil          -> return Nothing
+        TCons x cell' -> do
+            writeTVar rv $ ReadEnd cell' (readCounter r + 1) 0
+            return $ Just (x, readDiscarded r)
 
 -- | Test if the queue is empty.
 isEmpty :: RollingQueue a -> STM Bool
-isEmpty = undefined
+isEmpty (RQ rv _) = do
+    r <- readTVar rv
+    xs <- readTVar (readPtr r)
+    case xs of
+        TNil      -> return True
+        TCons _ _ -> return False
 
 -- | /O(1)/ Get the number of items in the queue.
 length :: RollingQueue a -> STM Int
-length = undefined
+length (RQ rv wv) = do
+    r <- readTVar rv
+    w <- readTVar wv
+    return (writeCounter w - readCounter r)
 
 -- | Adjust the size limit.  Queue entries will be discarded if necessary to
 -- satisfy the new limit.
