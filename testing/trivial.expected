@@ -1,0 +1,420 @@
+newIO 5:
+[]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 0
+sizeLimit     = 5
+
+read rq, isEmpty:
+[]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 0
+sizeLimit     = 5
+
+write rq 1:
+[1]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 5
+
+write rq 2:
+[1,2]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 2
+sizeLimit     = 5
+
+write rq 3:
+[1,2,3]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 3
+sizeLimit     = 5
+
+write rq 4:
+[1,2,3,4]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 4
+sizeLimit     = 5
+
+write rq 5:
+[1,2,3,4,5]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 6:
+[2,3,4,5,6]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 7:
+[3,4,5,6,7]
+readCounter   = 0
+readDiscarded = 2
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 8:
+[4,5,6,7,8]
+readCounter   = 0
+readDiscarded = 3
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 9:
+[5,6,7,8,9]
+readCounter   = 0
+readDiscarded = 4
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 10:
+[6,7,8,9,10]
+readCounter   = 0
+readDiscarded = 5
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq (6,5):
+[7,8,9,10]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq (7,0):
+[8,9,10]
+readCounter   = 2
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq (8,0):
+[9,10]
+readCounter   = 3
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq (9,0):
+[10]
+readCounter   = 4
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq (10,0):
+[]
+readCounter   = 5
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq, isEmpty:
+[]
+readCounter   = 5
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 11:
+[11]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 5
+
+write rq 12:
+[11,12]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 2
+sizeLimit     = 5
+
+write rq 13:
+[11,12,13]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 3
+sizeLimit     = 5
+
+write rq 14:
+[11,12,13,14]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 4
+sizeLimit     = 5
+
+write rq 15:
+[11,12,13,14,15]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+write rq 16:
+[12,13,14,15,16]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 5
+sizeLimit     = 5
+
+read rq (12,1):
+[13,14,15,16]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 5
+sizeLimit     = 5
+
+setLimit rq 3:
+[14,15,16]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 3
+sizeLimit     = 3
+
+setLimit rq 10:
+[14,15,16]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 3
+sizeLimit     = 10
+
+write rq 17:
+[14,15,16,17]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 4
+sizeLimit     = 10
+
+write rq 18:
+[14,15,16,17,18]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 5
+sizeLimit     = 10
+
+write rq 19:
+[14,15,16,17,18,19]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 6
+sizeLimit     = 10
+
+write rq 20:
+[14,15,16,17,18,19,20]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 7
+sizeLimit     = 10
+
+write rq 21:
+[14,15,16,17,18,19,20,21]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 8
+sizeLimit     = 10
+
+write rq 22:
+[14,15,16,17,18,19,20,21,22]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 9
+sizeLimit     = 10
+
+write rq 23:
+[14,15,16,17,18,19,20,21,22,23]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 24:
+[15,16,17,18,19,20,21,22,23,24]
+readCounter   = 0
+readDiscarded = 2
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 25:
+[16,17,18,19,20,21,22,23,24,25]
+readCounter   = 0
+readDiscarded = 3
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 26:
+[17,18,19,20,21,22,23,24,25,26]
+readCounter   = 0
+readDiscarded = 4
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 27:
+[18,19,20,21,22,23,24,25,26,27]
+readCounter   = 0
+readDiscarded = 5
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 28:
+[19,20,21,22,23,24,25,26,27,28]
+readCounter   = 0
+readDiscarded = 6
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 29:
+[20,21,22,23,24,25,26,27,28,29]
+readCounter   = 0
+readDiscarded = 7
+writeCounter  = 10
+sizeLimit     = 10
+
+write rq 30:
+[21,22,23,24,25,26,27,28,29,30]
+readCounter   = 0
+readDiscarded = 8
+writeCounter  = 10
+sizeLimit     = 10
+
+read rq (21,8):
+[22,23,24,25,26,27,28,29,30]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 10
+sizeLimit     = 10
+
+read rq (22,0):
+[23,24,25,26,27,28,29,30]
+readCounter   = 2
+readDiscarded = 0
+writeCounter  = 10
+sizeLimit     = 10
+
+read rq (23,0):
+[24,25,26,27,28,29,30]
+readCounter   = 3
+readDiscarded = 0
+writeCounter  = 10
+sizeLimit     = 10
+
+setLimit rq -5:
+[]
+readCounter   = 0
+readDiscarded = 7
+writeCounter  = 0
+sizeLimit     = 0
+
+write rq 31 (limit is 0):
+[]
+readCounter   = 0
+readDiscarded = 8
+writeCounter  = 0
+sizeLimit     = 0
+
+write rq 32 (limit is 0):
+[]
+readCounter   = 0
+readDiscarded = 9
+writeCounter  = 0
+sizeLimit     = 0
+
+write rq 33 (limit is 0):
+[]
+readCounter   = 0
+readDiscarded = 10
+writeCounter  = 0
+sizeLimit     = 0
+
+write rq 34 (limit is 0):
+[]
+readCounter   = 0
+readDiscarded = 11
+writeCounter  = 0
+sizeLimit     = 0
+
+write rq 35 (limit is 0):
+[]
+readCounter   = 0
+readDiscarded = 12
+writeCounter  = 0
+sizeLimit     = 0
+
+read rq, isEmpty:
+[]
+readCounter   = 0
+readDiscarded = 12
+writeCounter  = 0
+sizeLimit     = 0
+
+setLimit rq 1:
+[]
+readCounter   = 0
+readDiscarded = 12
+writeCounter  = 0
+sizeLimit     = 1
+
+write rq 36:
+[36]
+readCounter   = 0
+readDiscarded = 12
+writeCounter  = 1
+sizeLimit     = 1
+
+read rq (36,12):
+[]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 1
+
+write rq 37:
+[37]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 1
+
+read rq (37,0):
+[]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 1
+
+write rq 38:
+[38]
+readCounter   = 0
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 1
+
+write rq 39:
+[39]
+readCounter   = 0
+readDiscarded = 1
+writeCounter  = 1
+sizeLimit     = 1
+
+read rq (39,1):
+[]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 1
+
+read rq, isEmpty:
+[]
+readCounter   = 1
+readDiscarded = 0
+writeCounter  = 1
+sizeLimit     = 1
+
