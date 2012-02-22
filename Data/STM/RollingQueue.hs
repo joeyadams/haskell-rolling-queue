@@ -36,6 +36,9 @@ import Control.Exception (Exception)
 import Control.Monad (join)
 import Data.Typeable (Typeable)
 
+import Data.STM.TList (TList)
+import qualified Data.STM.TList as TList
+
 -- | A 'RollingQueue' is a bounded FIFO channel.  When the size limit is
 -- exceeded, older entries are discarded to make way for newer entries.
 --
@@ -58,7 +61,7 @@ instance Eq (RollingQueue a) where
 --  * readCounter >= 0, readDiscarded >= 0
 data ReadEnd a =
     ReadEnd
-        { readPtr       :: !(TCell a)
+        { readPtr       :: !(TList a)
             -- ^ Pointer to next item in the stream
         , readCounter   :: !Int
             -- ^ Number of reads since we last synced with the writer
@@ -76,7 +79,7 @@ data ReadEnd a =
 --  * writeCounter >= 0, sizeLimit >= 0
 data WriteEnd a =
     WriteEnd
-        { writePtr      :: !(TCell a)
+        { writePtr      :: !(TList a)
             -- ^ Pointer to the hole (which is a TNil)
         , writeCounter  :: !Int
             -- ^ Write counter.  Number of items in the queue, not taking into
@@ -86,16 +89,13 @@ data WriteEnd a =
             --   'WriteEnd'.  This makes it convenient for 'write' to access.
         }
 
-type TCell a = TVar (TList a)
-data TList a = TNil | TCons a (TCell a)
-
 
 -- | Create a new, empty 'RollingQueue', with the given size limit.
 --
 -- To change the size limit later, use 'setLimit'.
 new :: Int -> STM (RollingQueue a)
 new limit = do
-    hole <- newTVar TNil
+    hole <- TList.empty
     rv <- newTVar $ ReadEnd hole 0 0
     wv <- newTVar $ WriteEnd hole 0 (max 0 limit)
     return (RQ rv wv)
@@ -104,8 +104,8 @@ new limit = do
 @IO@ variant of 'new'.  This is useful for creating top-level
 'RollingQueue's using 'System.IO.Unsafe.unsafePerformIO', because performing
 'atomically' inside a pure computation is extremely dangerous (can lead to
-'Control.Exception.NestedAtomically' errors and even segfaults, see GHC ticket
-#5866).
+'Control.Exception.NestedAtomically' errors and even segfaults,
+see GHC ticket #5866).
 
 Example:
 
@@ -117,7 +117,7 @@ logQueue = 'System.IO.Unsafe.unsafePerformIO' (RQ.'newIO' 1000)
 -}
 newIO :: Int -> IO (RollingQueue a)
 newIO limit = do
-    hole <- newTVarIO TNil
+    hole <- TList.emptyIO
     rv <- newTVarIO $ ReadEnd hole 0 0
     wv <- newTVarIO $ WriteEnd hole 0 (max 0 limit)
     return (RQ rv wv)
@@ -129,9 +129,8 @@ newIO limit = do
 write :: RollingQueue a -> a -> STM ()
 write rq@(RQ _ wv) x = do
     w <- readTVar wv
-    new_hole <- newTVar TNil
-    writeTVar (writePtr w) (TCons x new_hole)
-    updateWriteEnd rq $ WriteEnd new_hole (writeCounter w + 1) (sizeLimit w)
+    writePtr' <- TList.append (writePtr w) x
+    updateWriteEnd rq $ WriteEnd writePtr' (writeCounter w + 1) (sizeLimit w)
 
 -- | Read the next entry from the 'RollingQueue'.  'retry' if the queue is
 -- empty.
@@ -146,21 +145,18 @@ read rq = tryRead rq >>= maybe retry return
 tryRead :: RollingQueue a -> STM (Maybe (a, Int))
 tryRead (RQ rv _) = do
     r <- readTVar rv
-    xs <- readTVar (readPtr r)
-    case xs of
-        TNil          -> return Nothing
-        TCons x cell' -> do
-            writeTVar rv $ ReadEnd cell' (readCounter r + 1) 0
+    TList.uncons
+        (return Nothing)
+        (\x xs -> do
+            writeTVar rv $ ReadEnd xs (readCounter r + 1) 0
             return $ Just (x, readDiscarded r)
+        )
+        (readPtr r)
 
 -- | Test if the queue is empty.
 isEmpty :: RollingQueue a -> STM Bool
-isEmpty (RQ rv _) = do
-    r <- readTVar rv
-    xs <- readTVar (readPtr r)
-    case xs of
-        TNil      -> return True
-        TCons _ _ -> return False
+isEmpty (RQ rv _) =
+    readTVar rv >>= TList.null . readPtr
 
 -- | /O(1)/ Get the number of items in the queue.
 length :: RollingQueue a -> STM Int
@@ -206,7 +202,7 @@ syncEnds r w = do
     if count > limit
         then do
             let drop_count = count - limit
-            rp' <- dropItems drop_count (readPtr r)
+            rp' <- TList.drop drop_count (readPtr r)
             return ( ReadEnd rp' 0 (readDiscarded r + drop_count)
                    , WriteEnd (writePtr w) limit limit
                    )
@@ -214,17 +210,6 @@ syncEnds r w = do
             return ( ReadEnd (readPtr r) 0 (readDiscarded r)
                    , WriteEnd (writePtr w) count limit
                    )
-
--- | TCell variant of 'drop'.  This does not modify the cells themselves, it
--- just returns the new pointer.
-dropItems :: Int -> TCell a -> STM (TCell a)
-dropItems n cell
-    | n <= 0    = return cell
-    | otherwise = do
-        xs <- readTVar cell
-        case xs of
-            TNil          -> return cell
-            TCons _ cell' -> dropItems (n-1) cell'
 
 ------------------------------------------------------------------------
 -- Debugging
@@ -250,40 +235,24 @@ checkInvariants (RQ rv wv) = do
     check (writeCounter w >= 0) "writeCounter >= 0"
     check (sizeLimit    w >= 0) "sizeLimit >= 0"
     check (writeCounter w <= sizeLimit w) "writeCounter <= sizeLimit"
-    hole <- readTVar (writePtr w)
-    case hole of
-        TNil      -> return ()
-        TCons _ _ -> throwSTM $ CheckException "writePtr does not point to a TNil"
+    TList.uncons
+        (return ())
+        (\_ _ -> throwSTM $ CheckException "writePtr does not point to a TNil")
+        (writePtr w)
 
     check (writeCounter w >= readCounter r) "writeCounter >= readCounter"
-    len <- traverseLength (readPtr r)
+    len <- TList.length (readPtr r)
     check (writeCounter w - readCounter r == len) "writeCounter - readCounter == length"
 
     where
         check b expr | b         = return ()
                      | otherwise = throwSTM $ CheckException $ expr ++ " does not hold"
 
-traverseLength :: TCell a -> STM Int
-traverseLength = loop 0
-    where
-        loop !n cell = do
-            xs <- readTVar cell
-            case xs of
-                TNil          -> return n
-                TCons _ cell' -> loop (n+1) cell'
-
 -- | Return a list of all items currently in the queue.  This does not modify
 -- the 'RollingQueue'.
 getItems :: RollingQueue a -> STM [a]
-getItems (RQ rv _) = do
-    r <- readTVar rv
-    loop id (readPtr r)
-    where
-        loop dl cell = do
-            xs <- readTVar cell
-            case xs of
-                TNil          -> return $ dl []
-                TCons x cell' -> loop (dl . (x :)) cell'
+getItems (RQ rv _) =
+    readTVar rv >>= TList.toList . readPtr
 
 -- | Return a list of internal values as key-value pairs.
 getAttributes :: RollingQueue a -> STM [(String, String)]
